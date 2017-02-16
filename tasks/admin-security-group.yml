@@ -9,7 +9,7 @@
     region: "{{ aws_region }}"
     rules: "{{item.value.ingress | flatten}}"
     rules_egress: "{{item.value.egress | flatten}}"
-  with_dict: security_rules
+  with_dict: "{{ security_rules }}"
   register: sgs
   vars:
     nat_all_traffic:
@@ -63,4 +63,4 @@
       Source: "{{vpc_tag_name}}"
       Name: "{{env}}_{{item.item.key}}"
       Env: "{{env}}"
-  with_items: sgs.results
+  with_items: "{{ sgs.results }}"
