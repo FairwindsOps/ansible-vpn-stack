@@ -12,13 +12,13 @@
     region: "{{ aws_region }}"
     assign_public_ip: yes
     instance_tags:
-      Env: admin
+      Env: "{{ env }}"
       Stack: vpn
       Layer: vpn_primary
       Name: vpn_primary
     exact_count: 1
     count_tag:
-      Env: admin
+      Env: "{{ env }}"
       Stack: vpn
       Layer: vpn_primary
       Name: vpn_primary
