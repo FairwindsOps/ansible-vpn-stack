@@ -15,13 +15,12 @@
       Env: "{{ env }}"
       Stack: vpn
       Layer: vpn_primary
-      Name: vpn_primary
+      Name: "{{ env }}_vpn_primary"
     exact_count: 1
     count_tag:
       Env: "{{ env }}"
       Stack: vpn
       Layer: vpn_primary
-      Name: vpn_primary
   register: ec2
 
 - set_fact:
