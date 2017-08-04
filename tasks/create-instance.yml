@@ -5,23 +5,22 @@
     vpc_subnet_id: "{{ public_az1 }}"
     key_name: "{{ aws_key_name }}"
     instance_profile_name: "{{env}}_vpn"
-    group_id: "{{ admin_vpn }}"
+    group: "{{ env }}_vpn"
     instance_type: t2.small
     image: "{{ default_ami }}"
     wait: true
     region: "{{ aws_region }}"
     assign_public_ip: yes
     instance_tags:
-      Env: admin
+      Env: "{{ env }}"
       Stack: vpn
       Layer: vpn_primary
-      Name: vpn_primary
+      Name: "{{ env }}_vpn_primary"
     exact_count: 1
     count_tag:
-      Env: admin
+      Env: "{{ env }}"
       Stack: vpn
       Layer: vpn_primary
-      Name: vpn_primary
   register: ec2
 
 - set_fact:
