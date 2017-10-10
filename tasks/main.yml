@@ -1,5 +1,13 @@
 ---
 
 - include: admin-security-group.yml
+  when: destroy is not defined
+
 - include: vpn-bucket.yml
+  when: destroy is not defined
+
 - include: create-instance.yml
+  when: destroy is not defined
+
+- include: destroy.yml
+  when: destroy is defined

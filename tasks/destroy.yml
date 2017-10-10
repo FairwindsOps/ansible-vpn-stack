@@ -1,0 +1,83 @@
+---
+- name: Get vpn instance
+  ec2_remote_facts:
+    filters: 
+      "tag:Name": "{{ env }}_vpn_primary"
+  register: vpn
+
+- name: Delete DNS record
+  route53:
+    command: delete
+    record: "{{ openvpn_host }}"
+    zone: "{{ canonical_zone }}"
+    type: A
+    value: "{{ vpn.instances[0].public_ip_address }}"
+    overwrite: true
+  when: 
+    - vpn.instances
+    - vpn.instances[0].public_ip_address
+
+- name: Terminate vpn instance
+  ec2:
+    instance_ids: 
+      - "{{ vpn.instances[0].id }}"
+    state: absent
+  when: vpn.instances
+
+- name: Remove SSH key
+  ec2_key:
+    name: "{{ aws_key_name }}"
+    state: absent
+
+- name: VPN security groups
+  ec2_group:
+    state: absent
+    name: "{{env}}_{{item.key}}"
+    description: "{{env}}_{{item.key}}"
+    vpc_id: "{{ aws_vpc_id }}"
+    region: "{{ aws_region }}"
+    rules: "{{item.value.ingress | flatten}}"
+    rules_egress: "{{item.value.egress | flatten}}"
+  with_dict: "{{ security_rules }}"
+  register: sgs
+  vars:
+    nat_all_traffic:
+      - {group_name: "{{ env }}_nat", proto: 'tcp',   from_port: '1',   to_port: '65535'} # all tcp traffic to NAT
+    vpc_all_traffic:
+      - {cidr_ip: "{{aws_vpc_cidr}}", proto: 'tcp',   from_port: '1',   to_port: '65535'} # all tcp traffic
+      - {cidr_ip: "{{aws_vpc_cidr}}", proto: 'udp',   from_port: '1',   to_port: '65535'} # all udp traffic
+      - {cidr_ip: "{{aws_vpc_cidr}}", proto: 'icmp',  from_port: '-1',  to_port: '-1'}    # all icmp traffic
+    world_http_https:
+      - {cidr_ip: '0.0.0.0/0',              proto: 'tcp',     from_port: '80' , to_port: '80'}    # http to internet
+      - {cidr_ip: '0.0.0.0/0',              proto: 'tcp',     from_port: '443', to_port: '443'}   # https to internet
+    world_ping:
+      - {cidr_ip: '0.0.0.0/0',              proto: 'icmp',    from_port: '-1',  to_port: '-1'}    # all icmp traffic
+    world_ntp:
+      - {cidr_ip: '0.0.0.0/0',          proto: 'udp',     from_port: '123',  to_port: '123'}  # ntp to internet
+    security_rules:
+      vpn:
+        ingress:
+          - {cidr_ip: "0.0.0.0/0",          proto: tcp, from_port: '22',    to_port: '22'}
+          - {cidr_ip: "0.0.0.0/0",          proto: tcp, from_port: '1194',  to_port: '1194'}  # openvpn from internet
+          - {cidr_ip: "0.0.0.0/0",          proto: udp, from_port: '1194',  to_port: '1194'}  # openvpn from internet
+        egress:
+          - "{{vpc_all_traffic}}"
+          - "{{world_ntp}}"
+          - "{{world_http_https}}"
+      presentation:
+        ingress:
+          - {group_name: "{{ env }}_vpn", proto: tcp, from_port: '443', to_port: '443'} # https from vpn
+        egress:
+          - "{{vpc_all_traffic}}"
+      application:
+        ingress:
+          - {group_name: "{{env}}_presentation",  proto: tcp, from_port: '80',  to_port: '80'}   # http from presentation
+          - {group_name: "{{env}}_presentation",  proto: tcp, from_port: '443', to_port: '443'}  # https from presentation
+          - {group_name: "{{ env }}_application", proto: tcp, from_port: '22',  to_port: '22'}   # ssh from env hosts
+          - {group_name: "{{ env }}_vpn",         proto: tcp, from_port: '22',  to_port: '22'}   # ssh from vpn
+          - {group_name: "{{ env }}_vpn",         proto: tcp, from_port: '443', to_port: '443'}
+        egress: []
+      data:
+        ingress: []
+        egress:
+          - "{{vpc_all_traffic}}"
